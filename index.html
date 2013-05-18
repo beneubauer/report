@@ -1,0 +1,167 @@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Smarthouse Control</title>
+	<!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../../excanvas.min.js"></script><![endif]-->
+	<script src="./include/jquery.min.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<script language="javascript" type="text/javascript" src="./include/jquery.js"></script>
+	<script language="javascript" type="text/javascript" src="./include/jquery.flot.js"></script>
+	<script>
+		var mytest=0;
+		$(function(){
+			var iosocket = io.connect();
+			var temp = 0;
+			
+			function toggle_auto(event)
+			{
+				var message = $('#auto').text();
+				iosocket.send(message);
+				if (message == 'On') {
+					$('#auto').text('Off');
+					document.getElementById("lampButton").disabled = true;
+				}
+				else
+				{
+					$('#auto').text('On');
+					document.getElementById("lampButton").disabled = false;
+				}
+			}
+ 
+			//setInterval(function(){iosocket.send('analogRead');},1000);
+			
+			iosocket.on('connect', function () {
+			$('#incomingChatMessages').append($('<li>Connected</li>'));
+			});
+			iosocket.on('message', function(message) {
+				 $('#incomingChatMessages').append($('<li></li>').text(message));
+			});
+			iosocket.on('newtemp', function(message) {
+				//document.getElementById("analogs").innerHTML = Math.round((((oldtemp*5/1023)*100-50)*9/5+32)*100)/100;
+				document.getElementById("analogs").innerHTML = message + " &deg;F";
+				temp = message;
+				//document.getElementById("analogs").innerHTML=
+					
+					//Math.round((((oldtemp*5/1023)*100-50)*9/5+32)*100)/100+" F<br/>"
+					<!--+Math.round(message.A1*5000/1023)/1000+" V<br/>"-->
+					<!--+Math.round(message.A2*5000/1023)/1000+" V<br/>"-->
+					<!--+Math.round(message.A3*5000/1023)/1000+" V<br/>"-->
+					<!--+Math.round(message.A4*5000/1023)/1000+" V<br/>"-->
+					<!--+Math.round(message.A5*5000/1023)/1000+" V";-->
+
+			});
+			iosocket.on('disconnect', function() {
+				 $('#incomingChatMessages').append('<li>Disconnected</li>');
+			});
+			iosocket.on('tstat', function(message) {
+				document.getElementById("tstat").value = message;
+				//$('#incomingChatMessages').append(message);
+			});
+			iosocket.on('lamp_auto', function(message) {
+				if(message==0)
+				{
+					$('#auto').text("On");
+					document.getElementById("lampButton").disabled = false;
+				}
+				else
+				{
+					$('#auto').text("Off");
+					document.getElementById("lampButton").disabled = true;
+				}
+			});
+ 
+		   $('#outgoingChatMessage').keypress(function(event) {
+				if(event.which == 13) {
+					event.preventDefault();
+					iosocket.send($('#outgoingChatMessage').val());
+					$('#incomingChatMessages').append($('<li></li>').text($('#outgoingChatMessage').val()));
+					$('#outgoingChatMessage').val('');
+				}
+			});
+
+		$('#switchButton').bind('click', function(event) {
+			 var message = $('#switchButton').text();
+			 iosocket.send($('#switchButton').text());
+				  $('#switchButton').append($('<li></li>').text($('#switchButton').text()));
+				  if (message == 'Turn On')
+					   $('#switchButton').text('Turn Off');
+				  else
+					   $('#switchButton').text('Turn On');
+			 });
+		$('#lampButton').bind('click', function(event) {
+			 var message = $('#lampButton').text();
+			 iosocket.send($('#lampButton').text());
+				  $('#lampButton').append($('<li></li>').text($('#lampButton').text()));
+				  if (message == 'Lamp On')
+					   $('#lampButton').text('Lamp Off');
+				  else
+					   $('#lampButton').text('Lamp On');
+			 });
+		$('#tempdown').bind('click', function(event) {
+			iosocket.send('tempdown');
+		});
+		$('#tempup').bind('click', function(event) {
+			iosocket.send('tempup');
+		});
+		$('#auto').bind('click', toggle_auto);
+		
+		
+		//flot stuff
+		var data = [];
+		var totalpoints = 200;
+		var updateInterval = 700;
+		
+		function getData() {
+			if (data.length > 0)
+				data = data.slice(1);
+			
+			while (data.length < totalpoints) {
+				var prev = data.length > 0 ? data[data.length - 1] : 50;
+				var y = temp;
+				data.push(y);
+			}
+			
+			var res = [];
+			for (var i = 0; i < data.length; ++i)
+				res.push([i, data[i]])
+			return res;
+		}
+
+		// setup plot
+		var options = {
+			series: { shadowSize: 0 }, // drawing is faster without shadows
+			yaxis: { min: 65, max: 85 },
+			xaxis: { show: false }
+		};
+		var plot = $.plot($("#placeholder"), [ getData() ], options);
+
+		function update() {
+			plot.setData([ getData() ]);
+			// since the axes don't change, we don't need to call plot.setupGrid()
+			plot.draw();
+			
+			setTimeout(update, updateInterval);
+		}
+		update();
+		
+	});
+	</script>
+</head>
+<body>
+<div>
+  <center><img src="http://facilities.alaska.edu/ua/eworf/images/UAF_LOGO.gif"><br>
+CyberAK Smarthouse Control
+
+</div>
+<hr>
+LED: <button id="switchButton">Turn On</button><br>
+AUTO: <button id="auto">Off</button><br>
+LAMP: <button id="lampButton" disabled>Lamp On</button><br>
+<button id="tempdown">-</button><input type="text" id="tstat" size=3 readonly><button id="tempup">+</button>
+<div id="analogs"></div><br>
+<div id="placeholder" style="width:600px;height:300px"></div>
+<!--<input type="text" id="outgoingChatMessage"><br>-->
+Debug: <ul id="incomingChatMessages"></ul>
+</center>
+</body>
+</html>
